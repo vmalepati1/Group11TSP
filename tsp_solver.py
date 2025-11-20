@@ -8,15 +8,16 @@ It reads TSPLIB format files, finds a tour, and outputs the solution to a file.
 Supported Algorithms:
     - BF: Brute Force (optimal, slow)
     - Approx: MST-based 2-approximation (fast, not optimal)
+    - LS: Genetic Algorithm / Local Search (heuristic, requires seed)
 
 Usage:
     python tsp_solver.py -inst <filename> -alg <method> -time <cutoff> [-seed <seed>]
 
 Input:
     -inst: TSP instance filename (without .tsp extension, looks in DATA/ directory)
-    -alg: Algorithm method (BF, Approx)
+    -alg: Algorithm method (BF, Approx, LS)
     -time: Cutoff time in seconds
-    -seed: Random seed (optional)
+    -seed: Random seed (required for LS, optional for others)
 
 Output:
     Creates a solution file based on method and parameters.
@@ -28,6 +29,7 @@ import argparse
 from tsp_parser import parse_tsp_file
 import tsp_brute_force
 import tsp_approx
+import tsp_genetic
 
 
 def write_solution_file(instance_name, method, cutoff_time, seed, best_tour, best_distance):
@@ -54,6 +56,11 @@ def write_solution_file(instance_name, method, cutoff_time, seed, best_tour, bes
             filename = f"{instance_lower} {method} {seed}.sol"
         else:
             filename = f"{instance_lower} {method}.sol"
+    elif method == 'LS':
+        # For LS, both cutoff and seed are required
+        if seed is None:
+            raise ValueError("Seed is required for LS method")
+        filename = f"{instance_lower} {method} {int(cutoff_time)} {seed}.sol"
     else:
         # Default fallback
         filename = f"{instance_lower} {method} {int(cutoff_time)}.sol"
@@ -80,6 +87,11 @@ def main():
     parser.add_argument('-seed', type=int, help='Random seed')
     
     args = parser.parse_args()
+    
+    # Validate method-specific requirements
+    if args.alg == 'LS' and args.seed is None:
+        print("Error: Seed parameter is required for LS (Local Search) method.")
+        sys.exit(1)
     
     # Validate cutoff time
     if args.time <= 0:
@@ -112,8 +124,11 @@ def main():
             best_tour, best_distance = tsp_approx.solve_tsp(coordinates, args.time)
             
         elif args.alg == 'LS':
-            print("Error: Local Search (LS) not yet implemented.")
-            sys.exit(1)
+            if args.seed is None:
+                print("Error: Seed parameter is required for LS method.")
+                sys.exit(1)
+            print(f"Running Genetic Algorithm / Local Search (cutoff: {args.time}s, seed: {args.seed})...")
+            best_tour, best_distance = tsp_genetic.solve_tsp(coordinates, args.time, args.seed)
             
         if best_tour is None:
             print("Error: No solution found.")
